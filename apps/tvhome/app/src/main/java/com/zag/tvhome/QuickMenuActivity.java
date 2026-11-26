@@ -36,11 +36,9 @@ public class QuickMenuActivity extends Activity {
 
         TextView first = add(panel, "Manage installed applications", true, () -> Actions.openManageApps(this));
         if (last != null) {
-            add(panel, "Force stop " + lastName, false, () -> Actions.forceStop(this, last));
-            add(panel, lastName + ": storage & cache", false, () -> Actions.appInfo(this, last));
+            add(panel, lastName + ": force stop / clear cache", false, () -> Actions.appInfo(this, last));
         }
         add(panel, "All settings", false, () -> Actions.openSettings(this));
-        add(panel, "Sleep", false, () -> Actions.sleep(this));
 
         View spacer = new View(this);
         panel.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));

@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -16,7 +17,7 @@ import android.widget.TextView;
 /** One-time setup, the on/off switch, and Restore. */
 public class SetupActivity extends Activity {
     private final Handler main = new Handler(Looper.getMainLooper());
-    private TextView status, progress, takeoverBtn, holdBtn, setupBtn;
+    private TextView status, progress, takeoverBtn, holdBtn, setupBtn, manual;
     private volatile boolean busy;
 
     @Override
@@ -33,9 +34,9 @@ public class SetupActivity extends Activity {
         TextView intro = Ui.text(this,
                 "Setup makes the Home button on your remote open TV Home. Amazon's home screen is never "
                         + "removed, so Restore always brings it straight back.\n\n"
-                        + "When you press Set up, the TV will ask “Allow USB debugging?”. "
-                        + "Tick “Always allow from this computer”, then press OK. "
-                        + "That lets TV Home switch itself on and force stop apps for you.",
+                        + "Fire OS doesn't let apps give themselves this permission, so it takes one command, once, "
+                        + "from a phone or computer on the same Wi-Fi as this TV (steps below). "
+                        + "Then press Set up the Home button.",
                 16, Ui.TEXT_DIM, false);
         intro.setPadding(0, dp(10), 0, dp(18));
         intro.setLineSpacing(0, 1.2f);
@@ -47,6 +48,16 @@ public class SetupActivity extends Activity {
         progress = Ui.text(this, "", 15, 0xFFFBBF24, false);
         progress.setPadding(0, dp(10), 0, dp(10));
         col.addView(progress);
+
+        manual = Ui.text(this, "", 15, Ui.TEXT, false);
+        manual.setTypeface(android.graphics.Typeface.MONOSPACE);
+        manual.setLineSpacing(0, 1.3f);
+        manual.setPadding(dp(18), dp(14), dp(18), dp(14));
+        manual.setBackground(Ui.round(this, Ui.PANEL, 12));
+        LinearLayout.LayoutParams mLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        mLp.bottomMargin = dp(16);
+        col.addView(manual, mLp);
 
         setupBtn = add(col, "Set up the Home button", true, this::runSetup);
         takeoverBtn = add(col, "", false, () -> {
@@ -102,6 +113,18 @@ public class SetupActivity extends Activity {
         holdBtn.setText(Prefs.replaceHold(this)
                 ? "Hold Home shows TV Home's quick menu: ON" : "Hold Home shows TV Home's quick menu: OFF");
         setupBtn.setText(enabled ? "Run setup again" : "Set up the Home button");
+        boolean granted = hasSecureSettings();
+        manual.setVisibility(enabled ? View.GONE : View.VISIBLE);
+        manual.setText(granted
+                ? "Permission received. Press “Set up the Home button” to finish."
+                : "One-time step, from a phone or computer on the same Wi-Fi as this TV:\n\n"
+                + "1. In an ADB app (e.g. Remote ADB Shell on Android) or a computer, connect to\n"
+                + "   " + wifiIp() + "   port 5555\n"
+                + "   and press OK on the TV when it asks “Allow USB debugging?”\n\n"
+                + "2. Run this one command:\n"
+                + "   pm grant " + getPackageName() + " android.permission.WRITE_SECURE_SETTINGS\n"
+                + "   (on a computer, put “adb shell” in front of it)\n\n"
+                + "3. Come back here and press “Set up the Home button”.");
         TextView diag = (TextView) ((ViewGroup) status.getParent()).findViewWithTag("diag");
         String backup = Prefs.backup(this);
         diag.setText("Backup taken before setup:\n" + (backup == null ? "(none yet)" : backup)
@@ -112,7 +135,55 @@ public class SetupActivity extends Activity {
         main.post(() -> progress.setText(msg));
     }
 
+    private boolean hasSecureSettings() {
+        return checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    private static String wifiIp() {
+        try {
+            for (java.net.NetworkInterface ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                for (java.net.InetAddress a : java.util.Collections.list(ni.getInetAddresses())) {
+                    if (a instanceof java.net.Inet4Address && a.isSiteLocalAddress()) return a.getHostAddress();
+                }
+            }
+        } catch (Exception ignored) {}
+        return "(this TV's IP: Settings > My Fire TV > About > Network)";
+    }
+
+    /** With the permission granted from outside, TV Home switches itself on and keeps other services. */
+    private void setupDirectly() {
+        android.content.ContentResolver cr = getContentResolver();
+        String services = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        String enabled = String.valueOf(Settings.Secure.getInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 0));
+        if (Prefs.backup(this) == null) {
+            String report = "Fire OS (Android " + Build.VERSION.RELEASE + "), build " + Build.DISPLAY
+                    + "\nAccessibility services: " + services
+                    + "\nAccessibility enabled: " + enabled;
+            Prefs.saveBackup(this, report, services, enabled);
+        }
+        String id = Util.serviceId(this);
+        String cur = services == null || "null".equals(services) ? "" : services.trim();
+        String next = cur.isEmpty() ? id : (cur.contains(id) ? cur : cur + ":" + id);
+        Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, next);
+        Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1);
+        Prefs.setTakeover(this, true);
+    }
+
     private void runSetup() {
+        if (hasSecureSettings()) {
+            try {
+                setupDirectly();
+                progress.setText(Util.serviceEnabled(this)
+                        ? "Done. Press Home on your remote to test it."
+                        : "Saved, but Fire OS didn't switch it on. Try Open Accessibility settings below.");
+            } catch (Exception e) {
+                progress.setText("Setup couldn't finish: " + e.getMessage());
+            }
+            refresh();
+            return;
+        }
         busy = true;
         progress.setText("Connecting… if the TV asks “Allow USB debugging?”, tick Always allow and press OK.");
         new Thread(() -> {
@@ -144,8 +215,8 @@ public class SetupActivity extends Activity {
             } catch (Exception e) {
                 main.post(() -> {
                     busy = false;
-                    progress.setText("Setup couldn't finish: " + e.getMessage()
-                            + "\nCheck that ADB debugging is on in Settings > My Fire TV > Developer options, then try again.");
+                    progress.setText("This Fire TV doesn't let apps do this step themselves. "
+                            + "Use a phone or computer for the one-time step below, then press Set up again.\n(" + e.getMessage() + ")");
                     refresh();
                 });
             }

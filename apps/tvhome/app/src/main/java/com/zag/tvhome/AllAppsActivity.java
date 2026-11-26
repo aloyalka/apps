@@ -86,9 +86,7 @@ public class AllAppsActivity extends Activity {
                 Util.toast(this, e.label + " added to your home screen");
             });
         }
-        labels.add("Force stop");
-        acts.add(() -> Actions.forceStop(this, e.pkg));
-        labels.add("Storage & cache (app settings)");
+        labels.add("Force stop / clear cache (app settings)");
         acts.add(() -> Actions.appInfo(this, e.pkg));
         labels.add("Uninstall");
         acts.add(() -> Actions.uninstall(this, e.pkg));

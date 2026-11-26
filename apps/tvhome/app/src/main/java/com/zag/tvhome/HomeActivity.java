@@ -239,9 +239,7 @@ public class HomeActivity extends Activity {
             reloadAndFocus();
         });
         if (e != null) {
-            labels.add("Force stop");
-            acts.add(() -> Actions.forceStop(this, tok));
-            labels.add("Storage & cache (app settings)");
+            labels.add("Force stop / clear cache (app settings)");
             acts.add(() -> Actions.appInfo(this, tok));
             labels.add("Uninstall");
             acts.add(() -> Actions.uninstall(this, tok));

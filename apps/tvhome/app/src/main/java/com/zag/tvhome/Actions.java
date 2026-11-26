@@ -4,15 +4,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.Settings;
 
 /** Things the home screen, all-apps screen and quick menu can do. */
 final class Actions {
     private Actions() {}
-
-    private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     static void openManageApps(Context c) {
         Intent[] tries = {
@@ -45,32 +41,17 @@ final class Actions {
         Util.toast(c, "Install it from the Fire TV app store, then come back here");
     }
 
+    /**
+     * Fire OS blocks apps from running ADB on the TV itself, so Force stop opens the app's
+     * settings page, where Force stop and Clear cache are one click each.
+     */
     static void forceStop(Context c, String pkg) {
         if (!Util.safePkg(pkg)) return;
-        final Context app = c.getApplicationContext();
-        final String name = Util.label(app, pkg);
-        new Thread(() -> {
-            try {
-                Adb.shell(app, "am force-stop " + pkg);
-                MAIN.post(() -> Util.toast(app, "Stopped " + name));
-            } catch (Exception e) {
-                MAIN.post(() -> {
-                    Util.toast(app, "Couldn't force stop directly, opening " + name + "'s settings page");
-                    appInfo(app, pkg);
-                });
-            }
-        }).start();
+        appInfo(c, pkg);
     }
 
     static void sleep(Context c) {
-        final Context app = c.getApplicationContext();
-        new Thread(() -> {
-            try {
-                Adb.shell(app, "input keyevent 223");
-            } catch (Exception e) {
-                MAIN.post(() -> Util.toast(app, "Couldn't put the TV to sleep: hold Home and use Amazon's Sleep option"));
-            }
-        }).start();
+        Util.toast(c, "To sleep: hold Home on the remote for a moment and use Amazon's Sleep option, or press the power button.");
     }
 
     static void openAmazonHome(Context c) {
