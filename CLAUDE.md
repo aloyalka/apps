@@ -29,7 +29,7 @@ This repo holds all of Anshuman's Android apps (phone and Fire TV). GitHub Actio
 
 ## Build failures
 - A failed build opens a GitHub issue titled `Build failed: <slug>` with the error. The next good build closes it.
-- After pushing, check the build: `gh run list --workflow build.yml`, then `gh run view <id> --log-failed`. Also check for open `Build failed:` issues. Fix the cause and push again.
+- After pushing, check the build: `gh run list --workflow build.yml`, then `gh run view <id> --log-failed`. Also check for open `Build failed:` issues with `gh api repos/<owner>/<repo>/issues` (GraphQL commands like `gh issue list` may be blocked in Claude sessions). Fix the cause and push again.
 
 ## Fire TV notes
 - Fire OS 7 is Android 9 (API 28). Vega OS devices (version 1.x) can't sideload apps.
