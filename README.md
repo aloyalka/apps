@@ -9,5 +9,6 @@ The page that lists every app is `https://<owner>.github.io/<repo>/`.
 | App | What it is |
 |---|---|
 | `tvhome` | TV Home: an ad-free Fire TV home screen with quick access to Manage Installed Applications |
+| `myapps` | My Apps: a Fire TV store that installs and updates the TV apps in this repo |
 
 To rebuild an app by hand: **Actions → Build apps → Run workflow**, then type the app's folder name.
