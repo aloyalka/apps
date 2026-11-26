@@ -1,0 +1,129 @@
+name: Build apps
+
+# Every folder in apps/ is one Android app. A push builds only the apps whose
+# folders changed, and publishes each one to its own release:
+#   https://github.com/<owner>/<repo>/releases/download/<app>-latest/<app>.apk
+# Run it by hand from the Actions tab to rebuild one app (or all of them).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "App folder to build (leave blank for all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-apps
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.find.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: find
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_APP: ${{ inputs.app }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          all=$(ls apps)
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_APP" ]; then
+              echo "$INPUT_APP" | grep -qE '^[a-z0-9-]+$' || { echo "Bad app name"; exit 1; }
+              list="$INPUT_APP"
+            else
+              list="$all"
+            fi
+          elif [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            list="$all"
+          else
+            changed=$(git diff --name-only "$BEFORE" HEAD)
+            if echo "$changed" | grep -qE '^(\.github/workflows/|signing/)'; then
+              list="$all"
+            else
+              list=$(echo "$changed" | awk -F/ '$1=="apps" && NF>2 {print $2}' | sort -u)
+            fi
+          fi
+          json=$(for a in $list; do [ -f "apps/$a/settings.gradle" ] && echo "$a"; done | jq -R . | jq -cs .)
+          echo "Apps to build: $json"
+          echo "apps=$json" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.apps != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.plan.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - name: Build ${{ matrix.app }}
+        env:
+          APP_VERSION_CODE: ${{ github.run_number }}
+        run: gradle -p "apps/${{ matrix.app }}" assembleRelease --no-daemon --stacktrace
+      - name: Name the APK
+        run: cp "apps/${{ matrix.app }}/app/build/outputs/apk/release/app-release.apk" "${{ matrix.app }}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-apk
+          path: ${{ matrix.app }}.apk
+      - name: Publish ${{ matrix.app }}-latest
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.app }}-latest
+          name: ${{ matrix.app }} (latest build ${{ github.run_number }})
+          body: "Latest build of ${{ matrix.app }}. Download: ${{ matrix.app }}.apk"
+          files: ${{ matrix.app }}.apk
+          make_latest: false
+
+  # A simple page listing every app, so a TV or phone only needs one short address.
+  # Needs Settings > Pages > Source set to "GitHub Actions" once; skipped quietly if not.
+  page:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make the download page
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p site
+          {
+            echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            echo '<title>My apps</title><style>body{font-family:sans-serif;background:#0b0f18;color:#f1f5f9;padding:32px}a{display:block;font-size:28px;color:#f1f5f9;background:#182033;padding:20px 24px;margin:12px 0;border-radius:12px;text-decoration:none}a:focus,a:hover{background:#f1f5f9;color:#0b0f18}</style></head><body><h1>My apps</h1>'
+            for a in $(ls apps); do
+              [ -f "apps/$a/settings.gradle" ] || continue
+              echo "<a href=\"https://github.com/$REPO/releases/download/$a-latest/$a.apk\">$a</a>"
+            done
+            echo '</body></html>'
+          } > site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
