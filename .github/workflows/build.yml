@@ -87,6 +87,22 @@ jobs:
         run: gradle -p "apps/${{ matrix.app }}" assembleRelease --no-daemon 2>&1 | tee build.log
       - name: Name the APK
         run: cp "apps/${{ matrix.app }}/app/build/outputs/apk/release/app-release.apk" "${{ matrix.app }}.apk"
+      # <app>.json tells the My Apps store app what this APK is (package, version, TV or phone).
+      - name: Describe the APK
+        shell: bash
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          if [ -x "${bt}aapt" ]; then "${bt}aapt" dump badging "$APP.apk" > badging.txt; else "${bt}aapt2" dump badging "$APP.apk" > badging.txt; fi
+          pkg=$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" badging.txt | head -1)
+          vc=$(sed -n "s/^package: .*versionCode='\([0-9]*\)'.*/\1/p" badging.txt | head -1)
+          vn=$(sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" badging.txt | head -1)
+          label=$(sed -n "s/^application-label:'\(.*\)'$/\1/p" badging.txt | head -1)
+          tv=false; grep -q '^leanback-launchable-activity' badging.txt && tv=true
+          jq -n --arg slug "$APP" --arg pkg "$pkg" --argjson vc "${vc:-0}" --arg vn "$vn" --arg label "${label:-$APP}" --argjson tv "$tv" \
+            '{slug:$slug, package:$pkg, versionCode:$vc, versionName:$vn, label:$label, tv:$tv}' > "$APP.json"
+          cat "$APP.json"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-apk
@@ -97,7 +113,9 @@ jobs:
           tag_name: ${{ matrix.app }}-latest
           name: ${{ matrix.app }} (latest build ${{ github.run_number }})
           body: "Latest build of ${{ matrix.app }}. Download: ${{ matrix.app }}.apk"
-          files: ${{ matrix.app }}.apk
+          files: |
+            ${{ matrix.app }}.apk
+            ${{ matrix.app }}.json
           make_latest: false
 
       # Failures open (or update) an issue titled "Build failed: <app>" with the error,
