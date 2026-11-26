@@ -22,6 +22,15 @@ This repo holds all of Anshuman's Android apps (phone and Fire TV). GitHub Actio
    `javac -cp <android.jar> ...` against the target API level.
 5. Push to `main`. Tell the user the app's download link, and that the build takes about 4 minutes.
 
+## Keeping apps separate (follow every time)
+- A change to one app touches only `apps/<slug>/`. Before committing, run `git diff --cached --name-only`. Every path must start with `apps/<slug>/`. If anything else shows up, stop and ask.
+- Never change `signing/` or `.github/workflows/` unless the user asks for that specific change. A change there rebuilds every app.
+- Commit one app per commit, with a message that starts with `<slug>:`.
+
+## Build failures
+- A failed build opens a GitHub issue titled `Build failed: <slug>` with the error. The next good build closes it.
+- After pushing, check the build: `gh run list --workflow build.yml`, then `gh run view <id> --log-failed`. Also check for open `Build failed:` issues. Fix the cause and push again.
+
 ## Fire TV notes
 - Fire OS 7 is Android 9 (API 28). Vega OS devices (version 1.x) can't sideload apps.
 - Install on the TV with the Downloader app, using the app's link or the all-apps page.

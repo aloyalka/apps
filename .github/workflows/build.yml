@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pages: write
   id-token: write
 
@@ -80,9 +81,10 @@ jobs:
         with:
           gradle-version: "8.7"
       - name: Build ${{ matrix.app }}
+        shell: bash
         env:
           APP_VERSION_CODE: ${{ github.run_number }}
-        run: gradle -p "apps/${{ matrix.app }}" assembleRelease --no-daemon --stacktrace
+        run: gradle -p "apps/${{ matrix.app }}" assembleRelease --no-daemon 2>&1 | tee build.log
       - name: Name the APK
         run: cp "apps/${{ matrix.app }}/app/build/outputs/apk/release/app-release.apk" "${{ matrix.app }}.apk"
       - uses: actions/upload-artifact@v4
@@ -97,6 +99,44 @@ jobs:
           body: "Latest build of ${{ matrix.app }}. Download: ${{ matrix.app }}.apk"
           files: ${{ matrix.app }}.apk
           make_latest: false
+
+      # Failures open (or update) an issue titled "Build failed: <app>" with the error,
+      # so the owner gets an email and Claude can read it. A later good build closes it.
+      - name: Report failure
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP: ${{ matrix.app }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Build failed: $APP"
+          {
+            echo "Run: $RUN_URL"
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo '```'
+            if [ -f build.log ]; then grep -E "error:|e: |FAILURE|What went wrong" -A3 build.log | head -60; echo "----- last lines -----"; tail -40 build.log; else echo "Failed before the build step; see the run link."; fi
+            echo '```'
+          } > body.md
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number,title -q ".[] | select(.title==\"$title\") | .number" | head -1)
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body-file body.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file body.md
+          fi
+
+      - name: Close old failure report
+        if: success()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP: ${{ matrix.app }}
+        run: |
+          title="Build failed: $APP"
+          for num in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number,title -q ".[] | select(.title==\"$title\") | .number"); do
+            gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment "Fixed: build ${{ github.run_number }} succeeded."
+          done
 
   # A simple page listing every app, so a TV or phone only needs one short address.
   # Needs Settings > Pages > Source set to "GitHub Actions" once; skipped quietly if not.
