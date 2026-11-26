@@ -106,7 +106,7 @@ public class MainActivity extends Activity {
             toggle.setText(showAll ? "Show TV apps only" : "Show phone apps too");
             render();
         });
-        for (TextView b : new TextView[]{updateAllBtn, refresh, setupBtn, toggle}) {
+        for (TextView b : new TextView[]{updateAllBtn, refresh, toggle}) {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.rightMargin = dp(12);
             bar.addView(b, lp);
@@ -328,8 +328,7 @@ public class MainActivity extends Activity {
         if (!getPackageManager().canRequestPackageInstalls()) {
             main.post(() -> {
                 busy = false;
-                say("Allow My Apps to install apps: Settings > My Fire TV > Developer options > Install unknown apps > My Apps. "
-                        + "Or press “Turn on one-click installs”.");
+                say("Allow My Apps to install apps: Settings > My Fire TV > Developer options > Install unknown apps > My Apps. Then try again.");
                 try {
                     startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
                 } catch (Exception ignored) {}
