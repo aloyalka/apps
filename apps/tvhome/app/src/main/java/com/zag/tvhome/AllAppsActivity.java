@@ -56,7 +56,7 @@ public class AllAppsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        apps = Apps.loadAll(this);
+        apps = Apps.loadAll(this, true);
         adapter.notifyDataSetChanged();
         grid.requestFocus();
     }
@@ -115,7 +115,7 @@ public class AllAppsActivity extends Activity {
             cell.setLayoutParams(new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116)));
 
             ImageView iv = new ImageView(AllAppsActivity.this);
-            iv.setBackground(Ui.round(AllAppsActivity.this, 0xFF243049, 8));
+            iv.setBackground(Ui.round(AllAppsActivity.this, Ui.TILE, 8));
             iv.setClipToOutline(true);
             if (e.banner != null) {
                 iv.setImageDrawable(e.banner);

@@ -23,10 +23,42 @@ final class Apps {
         Intent launch;
         Drawable banner;
         Drawable icon;
+        ActivityInfo info;
+        boolean artLoaded;
+    }
+
+    private static List<AppEntry> cache;
+    private static volatile boolean dirty = true;
+
+    /** Something changed (app installed or removed, favourites edited): rebuild on next view. */
+    static void markDirty() { dirty = true; }
+
+    static boolean isDirty() { return dirty || cache == null; }
+
+    /** The cached list without pictures, rebuilt only when something changed. */
+    static List<AppEntry> cached(Context c) {
+        if (cache == null || dirty) {
+            cache = loadAll(c, false);
+            dirty = false;
+        }
+        return cache;
+    }
+
+    static void loadArt(Context c, AppEntry e) {
+        if (e == null || e.artLoaded || e.info == null) return;
+        PackageManager pm = c.getPackageManager();
+        try {
+            e.banner = e.info.loadBanner(pm);
+            if (e.banner == null && e.info.applicationInfo != null) e.banner = e.info.applicationInfo.loadBanner(pm);
+        } catch (Exception ignored) {}
+        try {
+            e.icon = e.info.loadIcon(pm);
+        } catch (Exception ignored) {}
+        e.artLoaded = true;
     }
 
     /** Every app that can be opened from a TV home screen, sorted by name. */
-    static List<AppEntry> loadAll(Context c) {
+    static List<AppEntry> loadAll(Context c, boolean withArt) {
         PackageManager pm = c.getPackageManager();
         Map<String, AppEntry> map = new LinkedHashMap<>();
         String[] cats = {Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER};
@@ -50,13 +82,8 @@ final class Apps {
                 e.launch = new Intent(Intent.ACTION_MAIN).addCategory(cat)
                         .setClassName(pkg, ai.name)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-                try {
-                    e.banner = ai.loadBanner(pm);
-                    if (e.banner == null && ai.applicationInfo != null) e.banner = ai.applicationInfo.loadBanner(pm);
-                } catch (Exception ignored) {}
-                try {
-                    e.icon = ri.loadIcon(pm);
-                } catch (Exception ignored) {}
+                e.info = ai;
+                if (withArt) loadArt(c, e);
                 map.put(pkg, e);
             }
         }

@@ -14,8 +14,15 @@ final class Ui {
     static final int TEXT = 0xFFF1F5F9;
     static final int TEXT_DIM = 0xFFCBD5E1;
     static final int TEXT_FAINT = 0xFF94A3B8;
-    static final int INK = 0xFF0B0F18;
-    static final int PANEL = 0xFF182033;
+    static final int INK = 0xFF1C0609;
+    static final int PANEL = 0xFF34101A;
+    static final int TILE = 0xFF4A141C;
+
+    /** The rich red home background, shared by the home screen and the Home-press cover. */
+    static GradientDrawable homeBackground() {
+        return new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFF9B1B24, 0xFF5E0E16, 0xFF26060A});
+    }
 
     static GradientDrawable round(Context c, int color, float radiusDp) {
         GradientDrawable d = new GradientDrawable();

@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -26,6 +25,7 @@ import java.util.List;
 
 public class HomeActivity extends Activity {
     private static final int COLUMNS = 5;
+    private static final String ALL_APPS_TILE = "__all_apps__";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView clock, date, setupCard;
@@ -34,6 +34,12 @@ public class HomeActivity extends Activity {
     private List<String> favs = new ArrayList<>();
     private int lastFocus = 0;
     private boolean menuLongHandled;
+
+    private final android.content.BroadcastReceiver packagesChanged = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context c, Intent i) {
+            Apps.markDirty();
+        }
+    };
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
@@ -46,6 +52,19 @@ public class HomeActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(buildLayout());
+        android.content.IntentFilter f = new android.content.IntentFilter();
+        f.addAction(Intent.ACTION_PACKAGE_ADDED);
+        f.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        f.addAction(Intent.ACTION_PACKAGE_REPLACED);
+        f.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        f.addDataScheme("package");
+        registerReceiver(packagesChanged, f);
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { unregisterReceiver(packagesChanged); } catch (Exception ignored) {}
+        super.onDestroy();
     }
 
     @Override
@@ -53,12 +72,15 @@ public class HomeActivity extends Activity {
         super.onResume();
         View f = getCurrentFocus();
         boolean focusInGrid = f == null || f.getParent() == grid;
-        refresh();
+        // Rebuild only when an app was installed or removed, or favourites changed: keeps Home instant.
+        if (Apps.isDirty() || grid.getChildCount() == 0) refresh();
         if (focusInGrid && grid.getChildCount() > 0) {
             grid.getChildAt(Math.min(lastFocus, grid.getChildCount() - 1)).requestFocus();
         }
         setupCard.setVisibility(Util.serviceEnabled(this) ? View.GONE : View.VISIBLE);
         handler.post(tick);
+        // Once this screen has drawn, lift the cover the Home-button service put up.
+        getWindow().getDecorView().postDelayed(HomeService::homeVisible, 60);
     }
 
     @Override
@@ -74,8 +96,7 @@ public class HomeActivity extends Activity {
 
     private View buildLayout() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFF22304D, 0xFF141B2B, 0xFF0B0F18}));
+        root.setBackground(Ui.homeBackground());
         root.setClipChildren(false);
 
         LinearLayout col = new LinearLayout(this);
@@ -147,16 +168,60 @@ public class HomeActivity extends Activity {
     }
 
     private void refresh() {
-        all = Apps.loadAll(this);
+        all = Apps.cached(this);
         favs = Favourites.get(this, all);
         grid.removeAllViews();
         for (String tok : favs) {
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = dp(150);
-            lp.height = dp(84);
-            lp.setMargins(dp(8), dp(8), dp(8), dp(8));
-            grid.addView(makeTile(tok), lp);
+            Apps.loadArt(this, Apps.find(all, tok));
+            grid.addView(makeTile(tok), tileParams());
         }
+        grid.addView(makeAllAppsTile(), tileParams());
+    }
+
+    private GridLayout.LayoutParams tileParams() {
+        GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+        lp.width = dp(150);
+        lp.height = dp(84);
+        lp.setMargins(dp(8), dp(8), dp(8), dp(8));
+        return lp;
+    }
+
+    /** The last tile, right after the favourites: opens the full app list. */
+    private View makeAllAppsTile() {
+        FrameLayout t = new FrameLayout(this);
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setBackground(Ui.round(this, Ui.TILE, 10));
+        t.setClipToOutline(true);
+        t.setContentDescription("All apps");
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        v.setGravity(Gravity.CENTER);
+        GridLayout dots = new GridLayout(this);
+        dots.setColumnCount(2);
+        for (int i = 0; i < 4; i++) {
+            View d = new View(this);
+            d.setBackground(Ui.round(this, Ui.TEXT, 2));
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = dp(11);
+            lp.height = dp(11);
+            lp.setMargins(dp(2), dp(2), dp(2), dp(2));
+            dots.addView(d, lp);
+        }
+        v.addView(dots);
+        TextView label = Ui.text(this, "All apps", 15, Ui.TEXT, true);
+        label.setPadding(0, dp(6), 0, 0);
+        v.addView(label);
+        t.addView(v, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        t.setTag(ALL_APPS_TILE);
+        t.setOnClickListener(x -> startActivity(new Intent(this, AllAppsActivity.class)));
+        t.setOnFocusChangeListener((x, has) -> {
+            x.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(120).start();
+            x.setTranslationZ(has ? dp(8) : 0);
+            t.setForeground(has ? Ui.ring(this, 10) : null);
+            if (has) lastFocus = grid.indexOfChild(x);
+        });
+        return t;
     }
 
     private View makeTile(String tok) {
@@ -164,7 +229,7 @@ public class HomeActivity extends Activity {
         FrameLayout t = new FrameLayout(this);
         t.setFocusable(true);
         t.setClickable(true);
-        t.setBackground(Ui.round(this, e != null ? 0xFF243049 : 0x1AFFFFFF, 10));
+        t.setBackground(Ui.round(this, e != null ? Ui.TILE : 0x1AFFFFFF, 10));
         t.setClipToOutline(true);
         String name = e != null ? e.label : Favourites.nameFor(tok);
         t.setContentDescription(name);
@@ -288,7 +353,9 @@ public class HomeActivity extends Activity {
         if (keyCode == KeyEvent.KEYCODE_MENU) {
             if (!menuLongHandled && event.isTracking() && !event.isCanceled()) {
                 View f = getCurrentFocus();
-                if (f != null && f.getTag() instanceof String) tileOptions((String) f.getTag());
+                if (f != null && f.getTag() instanceof String && !ALL_APPS_TILE.equals(f.getTag())) {
+                    tileOptions((String) f.getTag());
+                }
             }
             menuLongHandled = false;
             return true;

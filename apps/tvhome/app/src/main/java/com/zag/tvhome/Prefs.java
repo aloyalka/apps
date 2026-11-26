@@ -51,19 +51,8 @@ final class Prefs {
         if (!pkg.equals(lastApp(c))) sp(c).edit().putString("lastApp", pkg).apply();
     }
 
-    static boolean homeKeySeen(Context c) { return sp(c).getBoolean("homeKeySeen", false); }
-    static void setHomeKeySeen(Context c) {
-        if (!homeKeySeen(c)) sp(c).edit().putBoolean("homeKeySeen", true).apply();
-    }
-
     static String windowLog(Context c) { return sp(c).getString("winlog", ""); }
-    static void logWindow(Context c, String line) {
-        String cur = windowLog(c);
-        String[] lines = cur.isEmpty() ? new String[0] : cur.split("\n");
-        StringBuilder b = new StringBuilder(line);
-        for (int i = 0; i < lines.length && i < 14; i++) b.append('\n').append(lines[i]);
-        sp(c).edit().putString("winlog", b.toString()).apply();
-    }
+    static void setWindowLog(Context c, String log) { sp(c).edit().putString("winlog", log).apply(); }
 
     static String backup(Context c) { return sp(c).getString("backup", null); }
     static String backupA11yServices(Context c) { return sp(c).getString("bk_services", null); }

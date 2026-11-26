@@ -100,6 +100,7 @@ final class Favourites {
     }
 
     static void add(Context c, String pkg) {
+        Apps.markDirty();
         List<String> l = Prefs.favourites(c);
         if (l == null) l = new ArrayList<>();
         if (!l.contains(pkg)) l.add(pkg);
@@ -107,6 +108,7 @@ final class Favourites {
     }
 
     static void remove(Context c, String pkg) {
+        Apps.markDirty();
         List<String> l = Prefs.favourites(c);
         if (l == null) return;
         l.remove(pkg);
@@ -114,6 +116,7 @@ final class Favourites {
     }
 
     static void move(Context c, int index, int delta) {
+        Apps.markDirty();
         List<String> l = Prefs.favourites(c);
         if (l == null) return;
         int to = index + delta;

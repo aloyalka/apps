@@ -106,7 +106,7 @@ public class SetupActivity extends Activity {
         boolean enabled = Util.serviceEnabled(this);
         boolean on = Prefs.takeoverOn(this);
         String s = "Home button takeover: " + (enabled ? (on ? "ON" : "paused") : "not set up yet")
-                + "\nHome button seen directly: " + (Prefs.homeKeySeen(this) ? "yes" : "not yet (press Home once to test)")
+
                 + "\nFire OS (Android " + Build.VERSION.RELEASE + ")";
         status.setText(s);
         takeoverBtn.setText(on ? "Pause takeover (Home goes to Amazon)" : "Resume takeover (Home opens TV Home)");
