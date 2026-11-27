@@ -29,11 +29,16 @@ final class Apps {
 
     private static List<AppEntry> cache;
     private static volatile boolean dirty = true;
+    private static volatile int version = 0;
 
     /** Something changed (app installed or removed, favourites edited): rebuild on next view. */
-    static void markDirty() { dirty = true; }
+    static void markDirty() {
+        dirty = true;
+        version++;
+    }
 
-    static boolean isDirty() { return dirty || cache == null; }
+    /** Goes up on every change; each home screen compares it with the version it last drew. */
+    static int version() { return version; }
 
     /** The cached list without pictures, rebuilt only when something changed. */
     static List<AppEntry> cached(Context c) {

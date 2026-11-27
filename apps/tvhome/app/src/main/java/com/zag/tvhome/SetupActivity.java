@@ -17,7 +17,7 @@ import android.widget.TextView;
 /** One-time setup, the on/off switch, and Restore. */
 public class SetupActivity extends Activity {
     private final Handler main = new Handler(Looper.getMainLooper());
-    private TextView status, progress, takeoverBtn, holdBtn, setupBtn, manual;
+    private TextView status, progress, takeoverBtn, setupBtn, manual;
     private volatile boolean busy;
 
     @Override
@@ -64,10 +64,6 @@ public class SetupActivity extends Activity {
             Prefs.setTakeover(this, !Prefs.takeoverOn(this));
             refresh();
         });
-        holdBtn = add(col, "", false, () -> {
-            Prefs.setReplaceHold(this, !Prefs.replaceHold(this));
-            refresh();
-        });
         add(col, "Open Accessibility settings (manual on/off)", false,
                 () -> Util.start(this, new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         add(col, "Open Amazon home screen", false, () -> Actions.openAmazonHome(this));
@@ -110,8 +106,6 @@ public class SetupActivity extends Activity {
                 + "\nFire OS (Android " + Build.VERSION.RELEASE + ")";
         status.setText(s);
         takeoverBtn.setText(on ? "Pause takeover (Home goes to Amazon)" : "Resume takeover (Home opens TV Home)");
-        holdBtn.setText(Prefs.replaceHold(this)
-                ? "Hold Home shows TV Home's quick menu: ON" : "Hold Home shows TV Home's quick menu: OFF");
         setupBtn.setText(enabled ? "Run setup again" : "Set up the Home button");
         boolean granted = hasSecureSettings();
         manual.setVisibility(enabled ? View.GONE : View.VISIBLE);

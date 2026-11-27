@@ -11,6 +11,7 @@ final class Actions {
     private Actions() {}
 
     static void openManageApps(Context c) {
+        HomeService.pause();
         Intent[] tries = {
                 new Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
                 new Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS),
@@ -22,11 +23,13 @@ final class Actions {
     }
 
     static void openSettings(Context c) {
+        HomeService.pause();
         if (!Util.start(c, new Intent(Settings.ACTION_SETTINGS))) Util.toast(c, "Couldn't open Settings");
     }
 
     /** The app's own page in Fire TV settings: Force stop, Clear cache, Clear data. */
     static void appInfo(Context c, String pkg) {
+        HomeService.pause();
         Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null));
         if (!Util.start(c, i)) openManageApps(c);
     }
@@ -37,6 +40,7 @@ final class Actions {
     }
 
     static void openStore(Context c, String pkg) {
+        HomeService.pause();
         if (Util.start(c, new Intent(Intent.ACTION_VIEW, Uri.parse("amzn://apps/android?p=" + pkg)))) return;
         Util.toast(c, "Install it from the Fire TV app store, then come back here");
     }
@@ -55,12 +59,11 @@ final class Actions {
     }
 
     static void openAmazonHome(Context c) {
-        Prefs.setBypass(c, 30L * 60 * 1000);
+        HomeService.pause();
         Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(Util.AMAZON_LAUNCHER);
         if (Util.start(c, i)) return;
         Intent alt = c.getPackageManager().getLaunchIntentForPackage(Util.AMAZON_LAUNCHER);
         if (alt != null && Util.start(c, alt)) return;
-        Prefs.clearBypass(c);
         Util.toast(c, "Couldn't open Amazon's home screen");
     }
 

@@ -31,21 +31,6 @@ final class Prefs {
     static boolean takeoverOn(Context c) { return sp(c).getBoolean("takeover", true); }
     static void setTakeover(Context c, boolean on) { sp(c).edit().putBoolean("takeover", on).apply(); }
 
-    /** Replace Amazon's hold-Home panel with our quick menu when it is spotted. */
-    static boolean replaceHold(Context c) { return sp(c).getBoolean("replaceHold", true); }
-    static void setReplaceHold(Context c, boolean on) { sp(c).edit().putBoolean("replaceHold", on).apply(); }
-
-    /** Set when the person chooses "Open Amazon home screen"; cleared on the next Home press. */
-    static boolean bypassActive(Context c) {
-        return System.currentTimeMillis() < sp(c).getLong("bypassUntil", 0);
-    }
-    static void setBypass(Context c, long millis) {
-        sp(c).edit().putLong("bypassUntil", System.currentTimeMillis() + millis).apply();
-    }
-    static void clearBypass(Context c) {
-        if (sp(c).getLong("bypassUntil", 0) != 0) sp(c).edit().putLong("bypassUntil", 0).apply();
-    }
-
     static String lastApp(Context c) { return sp(c).getString("lastApp", null); }
     static void setLastApp(Context c, String pkg) {
         if (!pkg.equals(lastApp(c))) sp(c).edit().putString("lastApp", pkg).apply();
